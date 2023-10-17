@@ -202,13 +202,14 @@ class JsonCredentials(Credentials):
                 )
 
 
-def find_nss(locations, nssname) -> ct.CDLL:
+def find_nss(locations, nssname, gluelibname) -> ct.CDLL:
     """Locate nss is one of the many possible locations"""
     fail_errors: list[tuple[str, str]] = []
 
     OS = ("Windows", "Darwin")
 
     for loc in locations:
+        mozgluelib = os.path.join(loc, gluelibname)
         nsslib = os.path.join(loc, nssname)
         LOG.debug("Loading NSS library from %s", nsslib)
 
@@ -229,6 +230,7 @@ def find_nss(locations, nssname) -> ct.CDLL:
                 os.chdir(loc)
 
         try:
+            mozglue: ct.CDLL = ct.CDLL(mozgluelib)
             nss: ct.CDLL = ct.CDLL(nsslib)
         except OSError as e:
             fail_errors.append((nsslib, str(e)))
@@ -274,6 +276,7 @@ def find_nss(locations, nssname) -> ct.CDLL:
 def load_libnss():
     """Load libnss into python using the CDLL interface"""
     if SYSTEM == "Windows":
+        gluelibname = "mozglue.dll"
         nssname = "nss3.dll"
         locations: list[str] = [
             "",  # Current directory or system lib finder
@@ -310,6 +313,7 @@ def load_libnss():
                 locations.append(nsslocation)
 
     elif SYSTEM == "Darwin":
+        gluelibname = "libmozglue.dylib"
         nssname = "libnss3.dylib"
         locations = (
             "",  # Current directory or system lib finder
@@ -327,6 +331,7 @@ def load_libnss():
         )
 
     else:
+        gluelibname = "libmozglue.so"
         nssname = "libnss3.so"
         if SYS64:
             locations = (
@@ -358,7 +363,7 @@ def load_libnss():
             )
 
     # If this succeeds libnss was loaded
-    return find_nss(locations, nssname)
+    return find_nss(locations, nssname, gluelibname)
 
 
 class c_char_p_fromstr(ct.c_char_p):
